@@ -52,20 +52,20 @@ fi
 mkdir -p $OUTPUT_DIR
 
 function _is_router() {
-`/usr/sbin/vcmd -c $1 -- vtysh -c 'show run' &>/dev/null`
-return $?
+  `/usr/sbin/vcmd -c $1 -- vtysh -c 'show run' &>/dev/null`
+  return $?
 }
 
 function ok() {
-echo -e "$1: \e[32mOK\e[0m"
+  echo -e "$1: \e[32mOK\e[0m"
 }
 
 function fail() {
-echo -e "$1: \e[31mFAIL\e[0m"
+  echo -e "$1: \e[31mFAIL\e[0m"
 }
 
 function persist() {
-echo -e "$1" > $2 && ok $2 || fail $2
+  echo -e "$1" > $2 && ok $2 || fail $2
 }
 
 # Proceso la instancia de Core
@@ -84,10 +84,28 @@ for file in $CORE/*; do
     fi
     # Configuración de interfaces eth*
     ip_net_addr=`/usr/sbin/vcmd -c $file -- bash -E -c 'ip -f inet -o addr' | awk '{print "ifconfig "$2" "$4}' | grep eth`
-    # Tabla de Ruteo
+    # Tabla de Ruteo main
     route_n=`/usr/sbin/vcmd -c $file -- bash -E -c 'route -n' | awk '{if ($1 == "0.0.0.0") print "route add default gw "$2}'`
+    # Obtento tablas de ruteo
     config=$ip_net_addr"\n"$route_n
+
+    # Obtento tablas de ruteo
+    tables=(`cat /etc/iproute2/rt_tables | grep -v "#" | awk '{if ($2 != "local" && $2 != "default" && $2 != "main" && "unspec" != $2) print $2}'`)
+    for table in ${tables[@]}; do
+      table_ls=`/usr/sbin/vcmd -c $file -- bash -E -c "ip route ls table $table"`
+      if [ -n "$table_ls" ]; then
+        table_ls=("${table_ls[@]/#/ip route add }")
+        table_ls=("${table_ls[@]/%/table $table}")
+        config="$config$table_ls"
+      fi
+    done
+
+    rules=`/usr/sbin/vcmd -c $file -- bash -E -c 'ip rule ls' | awk '!/0:/ && !/32766:/ && !/32767:/' | awk '{printf "ip rule add "; for(i=2;i<=NF;++i) printf $i" "; printf "\n"}'`
+    config="$config\n$rules"
     # Persisto e imprimo el resultado de la operación
     persist "$config" "$output_file.bash"
   fi
 done
+
+route_table=`cat /etc/iproute2/rt_tables`
+persist "$route_table" "${OUTPUT_DIR}tables"
