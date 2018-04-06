@@ -53,6 +53,8 @@ function fail() {
 echo -e "$1: \e[31mFAIL\e[0m"
 }
 
+[ -f $CONFIGS_DIR/tables ] && ( echo "Salvando rt_tables original en ${CONFIGS_DIR}rt_tables"; cp /etc/iproute2/rt_tables $CONFIGS_DIR/rt_tables )
+
 for file in $CONFIGS_DIR/*; do
   filename=$(basename "$file")
   cmd_type="${filename##*.}"
@@ -77,6 +79,7 @@ for file in $CONFIGS_DIR/*; do
       ;;
     "bash")
       cmd="$cmd_base bash -E -c "
+      [ -f $CONFIGS_DIR/tables ] && (eval "$cmd 'cat $CONFIGS_DIR/tables > /etc/iproute2/rt_tables'")
       while read line; do
         eval "$cmd '$line'" &>/dev/null
       done < "$file"
