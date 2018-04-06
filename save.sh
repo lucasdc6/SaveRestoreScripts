@@ -33,7 +33,8 @@ else
 fi
 
 # Ruta pasada como argumento
-OUTPUT_DIR=$1
+OUTPUT_DIR=${1%/}
+shift
 
 # Chequea si es el directio actual
 # o la ruta es relativa.
@@ -43,9 +44,9 @@ if [ "${#OUTPUT_DIR}" -eq "1" ] && [ "${OUTPUT_DIR:0:1}" = "." ]; then
   OUTPUT_DIR="$PWD/"
 elif [ "${OUTPUT_DIR:0:1}" != "/" ]; then
   # es relativo
-  OUTPUT_DIR="${PWD}/$OUTPUT_DIR/"
+  OUTPUT_DIR="${PWD}/$OUTPUT_DIR"
 else
-  OUTPUT_DIR="$1/"
+  OUTPUT_DIR="$OUTPUT_DIR"
 fi
 
 # Creo el directorio donde se guardará la configuración
@@ -75,7 +76,7 @@ for file in $CORE/*; do
     # Obtengo nombre del archivo
     filename="$(basename $file)"
     # Obtengo path absoluto del archivo a guardar
-    output_file="${OUTPUT_DIR}${filename}"
+    output_file="$OUTPUT_DIR/$filename"
     # Verifico si es un router
     if (_is_router $file); then
       config=`/usr/sbin/vcmd -c $file -- vtysh -E -c 'show run' 2>/dev/null | tail -n+5`
@@ -108,4 +109,4 @@ for file in $CORE/*; do
 done
 
 route_table=`cat /etc/iproute2/rt_tables`
-persist "$route_table" "${OUTPUT_DIR}tables"
+persist "$route_table" "$OUTPUT_DIR/tables"
