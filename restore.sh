@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # Valido parámetros
-if [ $# -eq 0 ];
-then
+if [ $# -eq 0 ]; then
   echo "Debe especificar la ruta de destino." && exit 1
 fi
 
@@ -30,30 +29,43 @@ else
 fi
 
 # Ruta pasada como argumento
-CONFIGS_DIR=$1
+CONFIGS_DIR=${1%/}
+shift
 
 # Chequea si es el directio actual
 # o la ruta es relativa.
 # Sino deja la absoluta pasada por parámetro
 if [ "${#CONFIGS_DIR}" -eq "1" ] && [ "${CONFIGS_DIR:0:1}" = "." ]; then
   # es directorio actual
-  CONFIGS_DIR="$PWD/"
+  CONFIGS_DIR="$PWD"
 elif [ "${CONFIGS_DIR:0:1}" != "/" ]; then
   # es relativa
-  CONFIGS_DIR="${PWD}/$CONFIGS_DIR/"
+  CONFIGS_DIR="${PWD}/$CONFIGS_DIR"
 else
-  CONFIGS_DIR=$1
+  CONFIGS_DIR=$CONFIGS_DIR
 fi
 
 function ok() {
-echo -e "$1: \e[32mOK\e[0m"
+  echo -e "$1: \e[32mOK\e[0m"
 }
 
 function fail() {
-echo -e "$1: \e[31mFAIL\e[0m"
+  echo -e "$1: \e[31mFAIL\e[0m"
 }
 
-[ -f $CONFIGS_DIR/tables ] && ( echo "Salvando rt_tables original en ${CONFIGS_DIR}rt_tables"; cp /etc/iproute2/rt_tables $CONFIGS_DIR/rt_tables )
+# Si tengo tablas de ruteo que restaurar y no tengo un backup del origina
+# Creo copia del original
+if [ -f $CONFIGS_DIR/tables -a ! -f $CONFIGS_DIR/rt_tables ]; then
+  echo "Salvando rt_tables original en $CONFIGS_DIR/rt_tables"
+  cp /etc/iproute2/rt_tables $CONFIGS_DIR/rt_tables
+fi
+
+# Si existe archivo de tablas de rutas tomo el primer socket y le envio el archivo
+if [ -f $CONFIGS_DIR/tables ]; then
+  # Me quedo con el primer router que encuentro
+  router=`find $CORE -type s -print -quit`
+  eval "/usr/sbin/vcmd -c $router -- bash -E -c 'cat $CONFIGS_DIR/tables > /etc/iproute2/rt_tables'"
+fi
 
 for file in $CONFIGS_DIR/*; do
   filename=$(basename "$file")
@@ -79,7 +91,6 @@ for file in $CONFIGS_DIR/*; do
       ;;
     "bash")
       cmd="$cmd_base bash -E -c "
-      [ -f $CONFIGS_DIR/tables ] && (eval "$cmd 'cat $CONFIGS_DIR/tables > /etc/iproute2/rt_tables'")
       while read line; do
         eval "$cmd '$line'" &>/dev/null
       done < "$file"
