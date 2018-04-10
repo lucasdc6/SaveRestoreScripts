@@ -54,15 +54,13 @@ function fail() {
 }
 
 # Si tengo tablas de ruteo que restaurar y no tengo un backup del origina
-# Creo copia del original
-if [ -f $CONFIGS_DIR/tables -a ! -f $CONFIGS_DIR/rt_tables ]; then
-  echo "Salvando rt_tables original en $CONFIGS_DIR/rt_tables"
-  cp /etc/iproute2/rt_tables $CONFIGS_DIR/rt_tables
-fi
-
-# Si existe archivo de tablas de rutas tomo el primer socket y le envio el archivo
-if [ -f $CONFIGS_DIR/tables ]; then
-  # Me quedo con el primer router que encuentro
+if [ -f $CONFIGS_DIR/tables ] && !(diff $CONFIGS_DIR/tables /etc/iproute2/rt_tables &>/dev/null); then
+  # Creo copia del original
+  if [ ! -f $CONFIGS_DIR/rt_tables ]; then
+    echo "Salvando rt_tables original en $CONFIGS_DIR/rt_tables"
+    cp /etc/iproute2/rt_tables $CONFIGS_DIR/rt_tables
+  fi
+  # Me quedo con el primer nodo que encuentro
   router=`find $CORE -type s -print -quit`
   eval "/usr/sbin/vcmd -c $router -- bash -E -c 'cat $CONFIGS_DIR/tables > /etc/iproute2/rt_tables'"
 fi
